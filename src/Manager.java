@@ -5,6 +5,7 @@ public class Manager {
 
     private final Scanner scanner = new Scanner(System.in);
     private int taskID = 0;
+    private boolean isUpdating = false;
 
     private HashMap<Integer, Task> tasks = new HashMap<>();
     private HashMap<Integer, SubTask> subTasks = new HashMap<>();
@@ -29,8 +30,8 @@ public class Manager {
                     manager.tasks.put(task.getTaskID(), task);
                     break;
                 case 3:
-                    SubTask subTask = manager.createSubTask();
-                    manager.subTasks.put(subTask.getEpicID(), subTask);
+                    manager.createSubTask();
+                    //manager.subTasks.put(subTask.getEpicID(), subTask);
                     break;
                 case 4:
                     manager.getAllEpicTasks();
@@ -73,6 +74,23 @@ public class Manager {
                     int id = manager.scanner.nextInt();
                     manager.deleteTaskByID(id);
                     break;
+                case 13:
+                    System.out.println("Введите ID задачи:");
+                    int taskIDToUpdate = manager.scanner.nextInt();
+                    Task updatedTask = manager.createTask();
+                    manager.tasks.put(taskIDToUpdate, updatedTask);
+                    manager.updateTask(updatedTask);
+                    break;
+                case 14:
+                    manager.isUpdating = true;
+                   // System.out.println("Введите ID подзадачи:");
+                    //int subTaskIDToUpdate = manager.scanner.nextInt();
+                    //SubTask someTask = manager.subTasks.get(subTaskIDToUpdate);
+                    //SubTask updatedSubTask = manager.createSubTask();
+                    manager.createSubTask();
+                    //manager.subTasks.put(subTaskIDToUpdate, updatedSubTask);
+                    //manager.updateSubTask(updatedSubTask);
+                    break;
                 case 0:
                     System.out.println("Выход из программы.");
                     isRunning = false;
@@ -82,6 +100,18 @@ public class Manager {
             }
         }
         manager.scanner.close();
+    }
+
+    public HashMap<Integer, Task> getTasks() {
+        return tasks;
+    }
+
+    public HashMap<Integer, SubTask> getSubTasks() {
+        return subTasks;
+    }
+
+    public HashMap<Integer, EpicTask> getEpicTasks() {
+        return epicTasks;
     }
 
     private void showMenu() {
@@ -98,6 +128,8 @@ public class Manager {
         System.out.println("10. Найти эпик");
         System.out.println("11. Удалить все задачи");
         System.out.println("12. Удалить задачу по ID");
+        System.out.println("13. Обновить задачу");
+        System.out.println("14. Обновить подзадачу");
         System.out.println("0. Выход");
     }
 
@@ -108,6 +140,7 @@ public class Manager {
         String epicDescription = scanner.nextLine();
         taskID++;
         EpicTask epicTask = new EpicTask(epicName, epicDescription, taskID);
+        epicTask.setEpicTasks(epicTask);
         System.out.println("Эпик создан с ID: " + epicTask.getTaskID());
         return epicTask;
     }
@@ -121,24 +154,56 @@ public class Manager {
         return new Task(taskName, taskDescription, taskID);
     };
 
-    private SubTask createSubTask() {
+    private void createSubTask() {
         System.out.println("Введите имя подзадачи:");
         String subTaskName = scanner.nextLine();
         System.out.println("Введите описание подзадачи:");
         String subTaskDescription = scanner.nextLine();
+
+        if (isUpdating) {
+            System.out.println("Введите ID подзадачи для обновления:");
+            int subTaskID = scanner.nextInt();
+            scanner.nextLine();
+
+            SubTask subTaskToUpdate = subTasks.get(subTaskID);
+            EpicTask epicTask = epicTasks.get(subTaskToUpdate.getEpicID());
+            System.out.println(epicTask.toString());
+
+            if (subTaskToUpdate != null) {
+                subTaskToUpdate.setTaskName(subTaskName);
+                subTaskToUpdate.setTaskDescription(subTaskDescription);
+                subTaskToUpdate.setTaskStatus("IN_PROGRESS");
+                subTasks.put(subTaskID, subTaskToUpdate);
+                epicTask.setEpicSubtasks(subTaskToUpdate);
+                epicTask.updateStatus();
+                System.out.println("Подзадача обновлена.");
+            } else {
+                System.out.println("Подзадача с таким ID не найдена.");
+            }
+            isUpdating = false;
+            return;
+        }
+
         System.out.println("Укажите номер Эпика:");
-        taskID++;
         int epicID = scanner.nextInt();
         scanner.nextLine();
-        return new SubTask(subTaskName, subTaskDescription, epicID, taskID);
+
+        taskID++;
+        SubTask subTask = new SubTask(subTaskName, subTaskDescription, epicID, taskID);
+        subTasks.put(subTask.getTaskID(), subTask);
+        EpicTask epicTask = epicTasks.get(epicID);
+        epicTask.setEpicSubtasks(subTask);
+        System.out.println("Подзадача создана с ID: " + subTask.getTaskID() + ", описание: " + subTask.getTaskDescription());
     }
+
 
     private void getAllTasks() {
         if (tasks.isEmpty()) {
             System.out.println("На данный момент задач нет.");
         } else {
             tasks.forEach((id, task) -> {
-                System.out.println("ID: " + id + ", Название: " + task.getTaskName());
+                System.out.println("ID: " + id + ", Название: " + task.getTaskName() + ", описание: " + task.getTaskDescription() +
+                        ", статус задачи: " + task.getTaskStatus());
             });
         }
     }
@@ -147,9 +212,10 @@ public class Manager {
         if (epicTasks.isEmpty()) {
             System.out.println("На данный момент эпики отсутствуют.");
         } else {
-            epicTasks.forEach((id, epc) -> {
-                System.out.println("ID: " + id + ". Название: " + epc.getTaskName());
-            });
+            for (EpicTask epicTask : epicTasks.values()) {
+                System.out.println("ID: " + epicTask.getTaskID() + ". Название: " + epicTask.getTaskName() +
+                        ", описание: " + epicTask.getTaskDescription() + ", статус: " + epicTask.getTaskStatus());
+            }
         }
     }
 
@@ -157,21 +223,25 @@ public class Manager {
         if (subTasks.isEmpty()) {
             System.out.println("На данный момент подзадачи отсутствуют.");
         } else {
-            subTasks.forEach((id, sub) -> {
-                System.out.println("ID: " + id + ". Название: " + sub.getTaskName());
-            });
+
+            for (SubTask subTask : subTasks.values()) {
+                System.out.println("ID: " + subTask.getTaskID() + ". Название: " + subTask.getTaskName() + ", описание: " +
+                        subTask.getTaskDescription() + ", статус: " + subTask.getTaskStatus());
+            }
         }
     }
 
     private void findSubTaskByEpicID(int epicID) {
-        subTasks.forEach((id, sub) -> {
-            if (id == epicID) {
+        for (SubTask subTask : subTasks.values()) {
+            if (subTask.getTaskID() == epicID) {
                 System.out.println("Подзадачи, связанные с данным эпиком:");
-                System.out.println("ID подзадачи: " + sub.getTaskID() + ", название: " + sub.getTaskName());
+                System.out.println("ID подзадачи: " + subTask.getTaskID() + ", название: " + subTask.getTaskName() +
+                        ", описание: " + subTask.getTaskDescription() +
+                        ", статус: " + subTask.getTaskStatus());
             } else {
                 System.out.println("Подзадач, связанных с эпиком " + epicID + " не найдено.");
             }
-        });
+        }
     }
 
     private void findSubTaskByID(int taskID) {
@@ -179,7 +249,7 @@ public class Manager {
             System.out.println("Найдена подзадача:");
             System.out.println("ID: " + subTasks.get(taskID).getTaskID() + ", название: " + subTasks.get(taskID).getTaskName() +
                     ", описание: " + subTasks.get(taskID).getTaskDescription() + ", принадлежит эпику: " +
-                    subTasks.get(taskID).getEpicID());
+                    subTasks.get(taskID).getEpicID() + ", статус: " + subTasks.get(taskID).getTaskStatus());
         }
     }
 
@@ -187,7 +257,8 @@ public class Manager {
         if (tasks.containsKey(taskID)) {
             System.out.println("Найдена задача:");
             System.out.println("ID: " + tasks.get(taskID).getTaskID() + ", название: " + tasks.get(taskID).getTaskName() +
-                    ", описание: " + tasks.get(taskID).getTaskDescription());
+                    ", описание: " + tasks.get(taskID).getTaskDescription() +
+                    ", статус: " + tasks.get(taskID).getTaskStatus());
         } else {
             System.out.println("Задачи с данным ID не найдено.");
         }
@@ -202,11 +273,12 @@ public class Manager {
     }
 
     private void deleteTaskByID(int taskID) {
-        if (tasks.containsKey(taskID) || (subTasks.containsKey(taskID) || epicTasks.containsKey(taskID))) {
+        if (tasks.containsKey(taskID)) {
             tasks.remove(taskID);
+        } else if (subTasks.containsKey(taskID)) {
             subTasks.remove(taskID);
+        } else if (epicTasks.containsKey(taskID)) {
             epicTasks.remove(taskID);
-            System.out.println("Задача " + taskID + " удалена.");
         } else {
             System.out.println("Произошла ошибка при удалении задачи с ID: " + taskID);
         }
@@ -216,10 +288,25 @@ public class Manager {
         if (epicTasks.containsKey(epicID)) {
             System.out.println("Найден эпик:");
             System.out.println("ID: " + epicTasks.get(epicID).getTaskID() + ", название: " + epicTasks.get(epicID).getTaskName() +
-                    ", описание: " + epicTasks.get(epicID).getTaskDescription());
+                    ", описание: " + epicTasks.get(epicID).getTaskDescription() +
+                    ", статус: " + epicTasks.get(epicID).getTaskStatus());
         } else {
             System.out.println("Эпика с таким ID " + epicID + " не найдено.");
         }
     }
 
+    private void updateEpic(EpicTask epicTask) {
+        epicTasks.put(epicTask.getTaskID(), epicTask);
+        epicTask.setEpicTasks(epicTask);
+    }
+
+    private void updateSubTask(SubTask subTask) {
+        subTasks.put(subTask.getTaskID(), subTask);
+    }
+
+    private void updateTask(Task task) {
+        tasks.put(task.getTaskID(), task);
+        epicTasks.get(task.getTaskID()).setTaskStatus("IN_PROGRESS");
+
+    }
 }
